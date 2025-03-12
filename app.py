@@ -8,18 +8,22 @@ EXCEL_FILE = "church_financial_records.xlsx"
 DEFAULT_USERS = ["Treasurer", "Guest"]  # Treasurer has full access
 
 # -------------------- LOAD DATA --------------------
+# -------------------- LOAD DATA --------------------
 def load_data():
     try:
         df = pd.read_excel(EXCEL_FILE, sheet_name="Records", dtype={"Transaction ID": str, "User": str})
     except FileNotFoundError:
         df = pd.DataFrame(columns=["User", "Transaction ID", "Date", "Category", "Subhead", "Debit", "Credit", "Balance"])
     
+    # Remove transactions without 'Transaction ID'
+    df = df.dropna(subset=["Transaction ID"])
+
     # Ensure required columns exist
     required_columns = ["User", "Transaction ID", "Date", "Category", "Subhead", "Debit", "Credit", "Balance"]
     for col in required_columns:
         if col not in df.columns:
             df[col] = "" if col in ["User", "Transaction ID", "Date", "Category", "Subhead"] else 0.0
-    
+
     df["Debit"] = pd.to_numeric(df["Debit"], errors="coerce").fillna(0.0).astype(float)
     df["Credit"] = pd.to_numeric(df["Credit"], errors="coerce").fillna(0.0).astype(float)
     df["Balance"] = pd.to_numeric(df["Balance"], errors="coerce").fillna(0.0).astype(float)
@@ -28,6 +32,7 @@ def load_data():
 
 # -------------------- SAVE DATA --------------------
 def save_data(df):
+    df = df.dropna(subset=["Transaction ID"])  # Remove transactions without a valid ID before saving
     with pd.ExcelWriter(EXCEL_FILE, mode="w", engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name="Records", index=False)
 
