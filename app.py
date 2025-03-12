@@ -13,6 +13,12 @@ def load_data():
     except FileNotFoundError:
         df = pd.DataFrame(columns=["User", "Transaction ID", "Date", "Category", "Subhead", "Debit", "Credit", "Balance"])
     
+    # Ensure all required columns exist
+    required_columns = ["User", "Transaction ID", "Date", "Category", "Subhead", "Debit", "Credit", "Balance"]
+    for col in required_columns:
+        if col not in df.columns:
+            df[col] = "" if col in ["User", "Transaction ID", "Date", "Category", "Subhead"] else 0.0
+    
     df["Debit"] = pd.to_numeric(df["Debit"], errors="coerce").fillna(0.0).astype(float)
     df["Credit"] = pd.to_numeric(df["Credit"], errors="coerce").fillna(0.0).astype(float)
     df["Balance"] = pd.to_numeric(df["Balance"], errors="coerce").fillna(0.0).astype(float)
