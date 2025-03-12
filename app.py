@@ -5,6 +5,7 @@ from openpyxl import load_workbook
 
 # -------------------- CONFIGURATION --------------------
 EXCEL_FILE = "church_financial_records.xlsx"
+DEFAULT_USERS = ["Treasurer", "Guest"]  # Treasurer has full access
 
 # -------------------- LOAD DATA --------------------
 def load_data():
@@ -13,7 +14,7 @@ def load_data():
     except FileNotFoundError:
         df = pd.DataFrame(columns=["User", "Transaction ID", "Date", "Category", "Subhead", "Debit", "Credit", "Balance"])
     
-    # Ensure all required columns exist
+    # Ensure required columns exist
     required_columns = ["User", "Transaction ID", "Date", "Category", "Subhead", "Debit", "Credit", "Balance"]
     for col in required_columns:
         if col not in df.columns:
@@ -51,8 +52,8 @@ def add_or_edit_transaction(user, transaction_id, date, category, subhead, debit
     debit = float(debit) if debit else 0.0
     credit = float(credit) if credit else 0.0
 
-    if transaction_id and transaction_id in df[df["User"] == user]["Transaction ID"].values:
-        df.loc[(df["User"] == user) & (df["Transaction ID"] == transaction_id), ["Date", "Category", "Subhead", "Debit", "Credit"]] = [date, category, subhead, debit, credit]
+    if transaction_id and transaction_id in df["Transaction ID"].values:
+        df.loc[df["Transaction ID"] == transaction_id, ["User", "Date", "Category", "Subhead", "Debit", "Credit"]] = [user, date, category, subhead, debit, credit]
     else:
         new_entry = {
             "User": user,
@@ -65,10 +66,9 @@ def add_or_edit_transaction(user, transaction_id, date, category, subhead, debit
         }
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
 
-    # Recalculate balance for the user
-    user_df = df[df["User"] == user]
-    df.loc[df["User"] == user, "Balance"] = user_df["Credit"].sum() - user_df["Debit"].sum()
-    
+    # Recalculate balance
+    df["Balance"] = df["Credit"].sum() - df["Debit"].sum()
+
     save_data(df)
 
 # -------------------- STREAMLIT UI --------------------
@@ -76,20 +76,21 @@ st.title("Church Financial Record Management System")
 
 # -------------------- USER LOGIN --------------------
 st.sidebar.subheader("User Login")
-user = st.sidebar.text_input("Enter your username:", value="Guest")
+user = st.sidebar.selectbox("Select User", DEFAULT_USERS + ["Custom User"])
+custom_user = st.sidebar.text_input("Enter Username", value="") if user == "Custom User" else user
 
-if not user:
+if not custom_user:
     st.warning("Please enter a username to continue.")
 else:
     menu = st.sidebar.selectbox("Select an option", ["Add or Edit Transaction", "View Reports"])
 
     if menu == "Add or Edit Transaction":
-        st.subheader(f"Add or Edit Transaction ({user})")
+        st.subheader(f"Add or Edit Transaction ({custom_user})")
 
         df = load_data()
 
-        # Filter transactions for the logged-in user
-        user_transactions = df[df["User"] == user]
+        # Filter transactions for the logged-in user (except for Treasurer)
+        user_transactions = df if custom_user == "Treasurer" else df[df["User"] == custom_user]
         transaction_ids = user_transactions["Transaction ID"].dropna().tolist() if not user_transactions.empty else []
         transaction_id = st.selectbox("Select transaction to edit (or leave blank to add new)", [""] + transaction_ids)
 
@@ -114,12 +115,12 @@ else:
         credit = st.number_input("Credit (Amount Received)", min_value=0.0, format="%.2f", value=credit)
 
         if st.button("Save Transaction"):
-            add_or_edit_transaction(user, transaction_id, date, category, subhead, debit, credit)
+            add_or_edit_transaction(custom_user, transaction_id, date, category, subhead, debit, credit)
             st.success("Transaction Saved Successfully!")
 
     elif menu == "View Reports":
-        st.subheader(f"Financial Reports ({user})")
+        st.subheader(f"Financial Reports ({custom_user})")
 
         df = load_data()
-        user_df = df[df["User"] == user]
+        user_df = df if custom_user == "Treasurer" else df[df["User"] == custom_user]
         st.dataframe(user_df)
